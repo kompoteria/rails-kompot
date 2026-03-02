@@ -1,0 +1,91 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+
+PRESET_FLAGS = %w[-d postgresql -T --api --minimal].freeze
+
+def usage
+  <<~USAGE
+    Usage: rails-kompot new <app_name_or_path> [extra rails options]
+
+    Creates a new Rails API application with preset flags:
+      #{PRESET_FLAGS.join(" ")}
+
+    Examples:
+      rails-kompot new my_app
+      rails-kompot new .
+      rails-kompot new my_app --skip-git
+  USAGE
+end
+
+command = ARGV[0]
+
+if command.nil? || command == "--help" || command == "-h"
+  puts usage
+  exit command.nil? ? 1 : 0
+end
+
+unless command == "new"
+  warn "Unknown command: #{command}"
+  warn usage
+  exit 1
+end
+
+app_name = ARGV[1]
+
+if app_name.nil?
+  warn "Error: missing app name or path\n\n"
+  warn usage
+  exit 1
+end
+
+extra_args = ARGV[2..]
+
+cmd = ["rails", "new", app_name, *PRESET_FLAGS, *extra_args]
+puts "Running: #{cmd.join(" ")}"
+system(*cmd) || abort("rails new failed")
+
+app_dir = app_name == "." ? Dir.pwd : File.expand_path(app_name)
+templates_dir = File.join(__dir__, "..", "templates")
+
+Dir.glob("#{templates_dir}/**/*", File::FNM_DOTMATCH).each do |src|
+  next if File.directory?(src)
+  relative = src.delete_prefix("#{templates_dir}/")
+  dest = File.join(app_dir, relative)
+  FileUtils.mkdir_p(File.dirname(dest))
+  FileUtils.cp(src, dest)
+end
+
+gemfile_path = File.join(app_dir, "Gemfile")
+File.open(gemfile_path, "a") do |f|
+  f.puts 'gem "factory_bot"'
+  f.puts
+  f.puts 'group :development do'
+  f.puts '  gem "rubocop"'
+  f.puts '  gem "rubocop-rails"'
+  f.puts '  gem "rubocop-rspec"'
+  f.puts '  gem "bullet"'
+  f.puts 'end'
+  f.puts
+  f.puts 'group :development, :test do'
+  f.puts '  gem "rspec-rails"'
+  f.puts '  gem "test-prof"'
+  f.puts '  gem "simplecov"'
+  f.puts 'end'
+end
+
+puts "Running: bundle install"
+system("bundle", "install", chdir: app_dir) || abort("bundle install failed")
+
+puts "Running: rails generate rspec:install"
+system("bundle", "exec", "rails", "generate", "rspec:install", chdir: app_dir) || abort("rails generate rspec:install failed")
+
+spec_helper_path = File.join(app_dir, "spec", "spec_helper.rb")
+if File.exist?(spec_helper_path)
+  original = File.read(spec_helper_path)
+  File.write(spec_helper_path, %(require "simplecov"\nSimpleCov.start "rails"\n\n) + original)
+end
+
+puts "Running: bundle exec rails g bullet:install"
+system("bundle", "exec", "rails", "g", "bullet:install", chdir: app_dir) || abort("rails g bullet:install failed")
