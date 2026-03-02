@@ -5,3 +5,9 @@ require:
 AllCops:
   NewCops: enable
   TargetRubyVersion: 3.2
+
+Style/Documentation:
+  Enabled: false
+
+Bundler/DuplicatedGroup:
+  Enabled: false

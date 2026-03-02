@@ -59,6 +59,7 @@ end
 
 gemfile_path = File.join(app_dir, "Gemfile")
 File.open(gemfile_path, "a") do |f|
+  f.puts
   f.puts 'gem "factory_bot"'
   f.puts
   f.puts 'group :development do'
@@ -75,6 +76,9 @@ File.open(gemfile_path, "a") do |f|
   f.puts 'end'
 end
 
+puts "Running: rails db:prepare"
+system("bundle", "exec", "rails", "db:prepare",  chdir: app_dir) || abort("rails db:prepare failed")
+
 puts "Running: bundle install"
 system("bundle", "install", chdir: app_dir) || abort("bundle install failed")
 
@@ -88,4 +92,13 @@ if File.exist?(spec_helper_path)
 end
 
 puts "Running: bundle exec rails g bullet:install"
-system("bundle", "exec", "rails", "g", "bullet:install", chdir: app_dir) || abort("rails g bullet:install failed")
+system('printf "y\n" | bundle exec rails g bullet:install', chdir: app_dir) || abort("rails g bullet:install failed")                     
+                                                                                                                                           
+puts "Running: bundle exec rubocop -A"                                                                                                      
+system("bundle", "exec", "rubocop", "-A", chdir: app_dir)                                                                                   
+                                                                                                                                        
+puts "Running: bundle exec rspec"                                                                                                           
+system("bundle", "exec", "rspec", chdir: app_dir)                                                                                    
+                                                                                                                                  
+puts "\nDone!"                                                                                                                       
+system("cd #{app_dir}") 
